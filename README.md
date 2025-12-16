@@ -112,6 +112,7 @@ For more details, see [Docker's networking documentation](https://docs.docker.co
 | `MCP_TRANSPORT` | No | `http` | Transport mode: `http` or `stdio` |
 | `MCP_HOST` | No | `0.0.0.0` | Host to bind to |
 | `MCP_PORT` | No | `8000` | Port to listen on |
+| `SEMAPHORE_SKIP_VALIDATION` | No | `false` | Skip connection validation at startup (not recommended) |
 
 ## What You Can Do
 
@@ -151,6 +152,25 @@ Once connected, you can interact with SemaphoreUI through natural conversation:
 ```bash
 docker logs semaphore-mcp
 ```
+
+**Connection validation fails at startup:**
+
+The MCP server now validates its connection to SemaphoreUI at startup. If validation fails:
+
+- Check that SemaphoreUI is running and accessible
+- Verify `SEMAPHORE_URL` is correct and reachable
+- Ensure `SEMAPHORE_API_TOKEN` is valid (check in SemaphoreUI user settings)
+- Check network connectivity between MCP server and SemaphoreUI
+- For debugging, enable verbose logging with `MCP_LOG_LEVEL=DEBUG`
+- To temporarily skip validation (not recommended):
+  ```bash
+  docker run -d --name semaphore-mcp \
+    --network host \
+    -e SEMAPHORE_URL=http://localhost:3000 \
+    -e SEMAPHORE_API_TOKEN=your-token \
+    -e SEMAPHORE_SKIP_VALIDATION=true \
+    ghcr.io/cloin/semaphore-mcp:latest
+  ```
 
 **Can't connect to SemaphoreUI from container:**
 - If SemaphoreUI is on localhost, use `--network host`

@@ -6,6 +6,7 @@ SemaphoreUI API functionality through MCP tools.
 """
 
 import logging
+import os
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
@@ -47,6 +48,23 @@ class SemaphoreMCPServer:
         self.url = semaphore_url or get_config("SEMAPHORE_URL")
         self.token = semaphore_token or get_config("SEMAPHORE_API_TOKEN")
         self.semaphore = create_client(self.url, self.token)
+
+        # Validate connection unless explicitly skipped
+        skip_validation = os.environ.get("SEMAPHORE_SKIP_VALIDATION", "false").lower() == "true"
+
+        if skip_validation:
+            logger.warning(
+                "SEMAPHORE_SKIP_VALIDATION is set - skipping connection validation. "
+                "This is not recommended for production use."
+            )
+        else:
+            logger.info(f"Validating connection to SemaphoreUI at {self.url}...")
+            try:
+                self.semaphore.validate_connection()
+                logger.info("SemaphoreUI connection validated successfully")
+            except ConnectionError as e:
+                logger.error(f"Failed to validate SemaphoreUI connection: {e}")
+                raise
 
         # Initialize FastMCP with host/port for HTTP transport
         self.mcp = FastMCP("semaphore", host=host, port=port)

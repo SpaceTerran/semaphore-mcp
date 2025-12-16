@@ -5,10 +5,14 @@ This module provides a client for interacting with SemaphoreUI's API.
 """
 
 import json
+import logging
 import os
+import time
 from typing import Any, Optional
 
 import requests
+
+logger = logging.getLogger("semaphore_mcp")
 
 
 class SemaphoreAPIClient:
@@ -31,6 +35,81 @@ class SemaphoreAPIClient:
 
         self.session.headers.update(
             {"Content-Type": "application/json", "Accept": "application/json"}
+        )
+
+    def validate_connection(self, retry_count: int = 3, timeout: int = 5) -> None:
+        """
+        Validate connection and authentication to SemaphoreUI API.
+
+        Tries multiple approaches in order:
+        1. /api/ping endpoint (lightweight health check)
+        2. GET /api/projects (authenticated endpoint as fallback)
+
+        Args:
+            retry_count: Number of retry attempts (default: 3)
+            timeout: Timeout in seconds for each request (default: 5)
+
+        Raises:
+            ConnectionError: If unable to connect after all retries
+            requests.exceptions.HTTPError: If authentication fails (401/403)
+        """
+        last_error = None
+
+        for attempt in range(retry_count):
+            try:
+                # Attempt 1: Try ping endpoint (no auth required, fastest)
+                ping_url = f"{self.base_url}/api/ping"
+                try:
+                    response = self.session.get(ping_url, timeout=timeout)
+                    if response.status_code == 200:
+                        logger.info("Connection validated via /api/ping")
+
+                        # If ping works, verify authentication with projects endpoint
+                        self._request("GET", "projects")
+                        logger.info("Authentication validated successfully")
+                        return
+                except requests.exceptions.RequestException:
+                    # Ping endpoint might not exist, fall through to projects
+                    pass
+
+                # Attempt 2: Use list_projects (authenticated, validates both)
+                self._request("GET", "projects")
+                logger.info("Connection and authentication validated via /api/projects")
+                return
+
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code in (401, 403):
+                    # Authentication errors should not be retried
+                    raise ConnectionError(
+                        f"Authentication failed: Invalid API token. "
+                        f"Status: {e.response.status_code}. "
+                        f"Please check SEMAPHORE_API_TOKEN."
+                    ) from e
+                last_error = e
+
+            except requests.exceptions.ConnectionError as e:
+                last_error = e
+
+            except requests.exceptions.Timeout as e:
+                last_error = e
+
+            except Exception as e:
+                last_error = e
+
+            # Exponential backoff: 1s, 4s, 10s
+            if attempt < retry_count - 1:
+                wait_time = (attempt + 1) ** 2
+                logger.warning(
+                    f"Connection attempt {attempt + 1}/{retry_count} failed: {last_error}. "
+                    f"Retrying in {wait_time}s..."
+                )
+                time.sleep(wait_time)
+
+        # All retries exhausted
+        raise ConnectionError(
+            f"Failed to connect to SemaphoreUI at {self.base_url} after {retry_count} attempts. "
+            f"Last error: {last_error}. "
+            f"Please check SEMAPHORE_URL and ensure SemaphoreUI is running."
         )
 
     def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:

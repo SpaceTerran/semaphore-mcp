@@ -18,6 +18,7 @@ DEFAULT_CONFIG = {
     "SEMAPHORE_URL": "http://localhost:3000",
     "SEMAPHORE_API_TOKEN": "",
     "MCP_LOG_LEVEL": "INFO",
+    "SEMAPHORE_SKIP_VALIDATION": "false",  # Set to "true" to skip startup validation
 }
 
 

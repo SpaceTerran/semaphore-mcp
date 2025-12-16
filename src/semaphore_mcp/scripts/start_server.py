@@ -56,13 +56,28 @@ def main():
 
         logging.getLogger("semaphore_mcp").setLevel(logging.DEBUG)
 
-    start_server(
-        semaphore_url=args.url,
-        semaphore_token=args.token,
-        transport=args.transport,
-        host=args.host,
-        port=args.port,
-    )
+    try:
+        start_server(
+            semaphore_url=args.url,
+            semaphore_token=args.token,
+            transport=args.transport,
+            host=args.host,
+            port=args.port,
+        )
+    except ConnectionError as e:
+        import logging
+        import sys
+
+        logger = logging.getLogger("semaphore_mcp")
+        logger.critical(f"Server startup failed: {e}")
+        sys.exit(1)
+    except Exception as e:
+        import logging
+        import sys
+
+        logger = logging.getLogger("semaphore_mcp")
+        logger.critical(f"Unexpected error during server startup: {e}", exc_info=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
